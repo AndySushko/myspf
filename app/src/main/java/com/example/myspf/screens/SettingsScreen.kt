@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.myspf.R
 import com.example.myspf.ui.theme.*
+import com.example.myspf.session.UserSession
 
 @Composable
 fun SettingsScreen(
@@ -44,7 +45,7 @@ fun SettingsScreen(
             )
 
             Text(
-                text = "Андрей",
+                text = UserSession.firstName ?: "Профиль",
                 fontSize = 18.sp,
                 color = BlackText,
                 fontWeight = FontWeight.Medium

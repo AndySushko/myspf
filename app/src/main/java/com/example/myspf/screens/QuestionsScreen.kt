@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.myspf.session.UserSession
 import com.example.myspf.ui.theme.*
 
 data class Question(
@@ -59,8 +60,76 @@ fun QuestionsScreen(
     var currentStep by remember { mutableStateOf(0) }
     var selectedAnswer by remember { mutableStateOf<Int?>(null) }
 
+    val selectedAnswers = remember {
+        mutableStateListOf<Int?>().apply {
+            repeat(questions.size) { add(null) }
+        }
+    }
+
     val currentQuestion = questions[currentStep]
     val progress = currentStep + 1
+
+    fun calculateQuestionnairePhototype(): String {
+        var score = 0
+
+        selectedAnswers.forEachIndexed { questionIndex, answerIndex ->
+            if (answerIndex == null) return@forEachIndexed
+
+            score += when (questionIndex) {
+                0 -> when (answerIndex) {
+                    0 -> 0
+                    1 -> 1
+                    2 -> 2
+                    3 -> 3
+                    else -> 4
+                }
+
+                1 -> when (answerIndex) {
+                    0 -> 0
+                    1 -> 1
+                    2 -> 2
+                    else -> 3
+                }
+
+                2 -> when (answerIndex) {
+                    0 -> 0
+                    else -> 2
+                }
+
+                3 -> when (answerIndex) {
+                    0 -> 0
+                    1 -> 1
+                    2 -> 2
+                    else -> 3
+                }
+
+                4 -> when (answerIndex) {
+                    0 -> 0
+                    1 -> 1
+                    2 -> 2
+                    3 -> 3
+                    else -> 4
+                }
+
+                5 -> when (answerIndex) {
+                    0 -> 0
+                    1 -> 1
+                    2 -> 2
+                    else -> 3
+                }
+
+                else -> 0
+            }
+        }
+
+        return when {
+            score <= 5 -> "I-II"
+            score <= 9 -> "III"
+            score <= 13 -> "IV"
+            score <= 17 -> "V"
+            else -> "VI"
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -89,7 +158,7 @@ fun QuestionsScreen(
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth((progress.toFloat() / questions.size.toFloat()))
+                    .fillMaxWidth(progress.toFloat() / questions.size.toFloat())
                     .height(12.dp)
                     .background(Color(0xFF824500), RoundedCornerShape(20.dp))
             )
@@ -125,6 +194,7 @@ fun QuestionsScreen(
                         .border(1.dp, Color(0xFFFFD2A0), RoundedCornerShape(16.dp))
                         .clickable {
                             selectedAnswer = index
+                            selectedAnswers[currentStep] = index
                         }
                         .padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -133,6 +203,7 @@ fun QuestionsScreen(
                         selected = selectedAnswer == index,
                         onClick = {
                             selectedAnswer = index
+                            selectedAnswers[currentStep] = index
                         },
                         colors = RadioButtonDefaults.colors(
                             selectedColor = Color(0xFF824500),
@@ -159,8 +230,10 @@ fun QuestionsScreen(
             onClick = {
                 if (currentStep < questions.lastIndex) {
                     currentStep++
-                    selectedAnswer = null
+                    selectedAnswer = selectedAnswers[currentStep]
                 } else {
+                    val questionnaireResult = calculateQuestionnairePhototype()
+                    UserSession.questionnairePhototype = questionnaireResult
                     onFinishClick()
                 }
             },

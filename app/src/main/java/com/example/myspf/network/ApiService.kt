@@ -8,6 +8,8 @@ import retrofit2.http.Path
 import okhttp3.MultipartBody
 import retrofit2.http.Multipart
 import retrofit2.http.Part
+import retrofit2.http.GET
+import retrofit2.http.Query
 
 interface ApiService {
 
@@ -32,4 +34,18 @@ interface ApiService {
     suspend fun predictPhototype(
         @Part file: MultipartBody.Part
     ): Response<PhototypePredictionResponse>
+
+    @GET("uv")
+    suspend fun getUv(
+        @Query("latitude") latitude: Double,
+        @Query("longitude") longitude: Double,
+        @Query("phototype") phototype: String
+    ): Response<UvResponse>
+
+    @GET("recommendations")
+    suspend fun getRecommendations(
+        @Query("latitude") latitude: Double,
+        @Query("longitude") longitude: Double,
+        @Query("phototype") phototype: String
+    ): Response<RecommendationsResponse>
 }

@@ -21,21 +21,31 @@ import com.example.myspf.session.UserSession
 import com.example.myspf.ui.theme.*
 import kotlinx.coroutines.launch
 
-
 @Composable
 fun AnalysisScreen(
     onContinueClick: () -> Unit,
     onRetryClick: () -> Unit
 ) {
-    val neuralResult = remember { UserSession.neuralPhototype ?: "III" }
-    val questionnaireResult = remember { "III" }
+    val scope = rememberCoroutineScope()
 
-    val isConsistent = neuralResult == questionnaireResult
+    val neuralResult = remember {
+        UserSession.neuralPhototype ?: "Не определён"
+    }
+
+    val questionnaireResult = remember {
+        UserSession.questionnairePhototype ?: "Не определён"
+    }
+
+    val confidence = remember {
+        UserSession.neuralConfidence
+    }
 
     var isLoading by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf("") }
 
-    val scope = rememberCoroutineScope()
+    val isConsistent = neuralResult == questionnaireResult &&
+            neuralResult != "Не определён" &&
+            questionnaireResult != "Не определён"
 
     Column(
         modifier = Modifier
@@ -86,7 +96,17 @@ fun AnalysisScreen(
                     fontSize = 20.sp
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                if (confidence != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = "Уверенность модели: ${"%.1f".format(confidence * 100)}%",
+                        color = InputPlaceholder,
+                        fontSize = 16.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
                     text = "Ответ анкеты: $questionnaireResult",
@@ -106,61 +126,64 @@ fun AnalysisScreen(
                     fontSize = 18.sp,
                     lineHeight = 24.sp
                 )
+
+                if (errorText.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = errorText,
+                        color = Color(0xFFC96F6F),
+                        fontSize = 16.sp,
+                        lineHeight = 20.sp
+                    )
+                }
             }
-        }
-
-        if (errorText.isNotBlank()) {
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = errorText,
-                color = Color(0xFFC96F6F),
-                fontSize = 16.sp
-            )
         }
 
         Spacer(modifier = Modifier.height(32.dp))
 
         Button(
             onClick = {
-                if (!isConsistent) {
-                    onRetryClick()
-                    return@Button
-                }
+                if (isConsistent) {
+                    val userId = UserSession.userId
 
-                val userId = UserSession.userId
-
-                if (userId == null) {
-                    errorText = "Ошибка: пользователь не найден"
-                    return@Button
-                }
-
-                scope.launch {
-                    try {
-                        isLoading = true
-                        errorText = ""
-
-                        val response = RetrofitClient.api.updatePhototype(
-                            userId = userId,
-                            request = PhototypeUpdateRequest(
-                                phototype = neuralResult
-                            )
-                        )
-
-                        if (response.isSuccessful) {
-                            val updatedUser = response.body()
-
-                            UserSession.phototype = updatedUser?.phototype
-
-                            onContinueClick()
-                        } else {
-                            errorText = "Не удалось сохранить фототип"
-                        }
-                    } catch (e: Exception) {
-                        errorText = "Ошибка подключения к серверу"
-                    } finally {
-                        isLoading = false
+                    if (userId == null) {
+                        errorText = "Ошибка: пользователь не найден"
+                        return@Button
                     }
+
+                    scope.launch {
+                        try {
+                            isLoading = true
+                            errorText = ""
+
+                            val response = RetrofitClient.api.updatePhototype(
+                                userId = userId,
+                                request = PhototypeUpdateRequest(
+                                    phototype = neuralResult
+                                )
+                            )
+
+                            if (response.isSuccessful) {
+                                val updatedUser = response.body()
+
+                                UserSession.phototype = updatedUser?.phototype ?: neuralResult
+
+                                onContinueClick()
+                            } else {
+                                errorText = "Не удалось сохранить фототип"
+                            }
+                        } catch (e: Exception) {
+                            errorText = "Ошибка подключения к серверу"
+                        } finally {
+                            isLoading = false
+                        }
+                    }
+                } else {
+                    UserSession.neuralPhototype = null
+                    UserSession.neuralConfidence = null
+                    UserSession.questionnairePhototype = null
+                    onRetryClick()
                 }
             },
             enabled = !isLoading,

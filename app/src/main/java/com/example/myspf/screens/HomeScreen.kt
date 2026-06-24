@@ -1,24 +1,31 @@
 package com.example.myspf.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.example.myspf.R
-import com.example.myspf.ui.theme.*
+import com.example.myspf.location.getCurrentLocation
+import com.example.myspf.network.RetrofitClient
+import com.example.myspf.network.UvResponse
 import com.example.myspf.session.UserSession
+import com.example.myspf.ui.theme.*
 
 @Composable
 fun HomeScreen(
@@ -28,6 +35,45 @@ fun HomeScreen(
     onRecommendationsClick: () -> Unit = {},
     onUvClick: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+
+    var uvData by remember { mutableStateOf<UvResponse?>(null) }
+
+    LaunchedEffect(Unit) {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!hasPermission) {
+            return@LaunchedEffect
+        }
+
+        try {
+            val location = getCurrentLocation(context)
+
+            val userLatitude = location?.latitude ?: 45.0355
+            val userLongitude = location?.longitude ?: 38.9753
+
+            val response = RetrofitClient.api.getUv(
+                latitude = userLatitude,
+                longitude = userLongitude,
+                phototype = UserSession.phototype ?: "I-II"
+            )
+
+            if (response.isSuccessful) {
+                uvData = response.body()
+            }
+        } catch (_: Exception) {
+            uvData = null
+        }
+    }
+
+    val phototype = UserSession.phototype ?: "не указан"
+    val currentUv = uvData?.current_uv ?: 0f
+    val riskLevel = uvData?.risk_level ?: "геолокация"
+    val maxSunTime = uvData?.max_sun_time ?: "не активна"
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -69,7 +115,10 @@ fun HomeScreen(
         Spacer(modifier = Modifier.height(30.dp))
 
         UvIndexCard(
-            phototype = UserSession.phototype ?: "не указан",
+            uvValue = currentUv,
+            riskLevel = riskLevel,
+            phototype = phototype,
+            maxSunTime = maxSunTime,
             onClick = onUvClick
         )
 
@@ -116,14 +165,26 @@ fun HomeScreen(
 
 @Composable
 fun UvIndexCard(
+    uvValue: Float,
+    riskLevel: String,
     phototype: String,
+    maxSunTime: String,
     onClick: () -> Unit = {}
 ) {
+    val cardColor = when (riskLevel) {
+        "низкий" -> Color(0xFF69C86F)
+        "умеренный" -> Color(0xFFE6B84F)
+        "высокий" -> Color(0xFFE58B45)
+        "очень высокий" -> Color(0xFFD96A6A)
+        "экстремальный" -> Color(0xFF9B4D9D)
+        else -> Color(0xFF69C86F)
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(180.dp)
-            .background(Color(0xFF69C86F), RoundedCornerShape(CornerSmall))
+            .background(cardColor, RoundedCornerShape(CornerSmall))
             .clickable { onClick() }
             .padding(horizontal = 20.dp, vertical = 14.dp)
     ) {
@@ -156,7 +217,7 @@ fun UvIndexCard(
                     modifier = Modifier.width(120.dp)
                 ) {
                     Text(
-                        text = "2.3",
+                        text = String.format("%.1f", uvValue),
                         color = Color.White,
                         fontSize = 44.sp,
                         fontWeight = FontWeight.Medium
@@ -165,7 +226,7 @@ fun UvIndexCard(
                     Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
-                        text = "низкий",
+                        text = riskLevel,
                         color = Color.White,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Normal
@@ -192,7 +253,7 @@ fun UvIndexCard(
                     Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
-                        text = "1 ч 17 мин",
+                        text = maxSunTime,
                         color = Color.White,
                         fontSize = 26.sp,
                         fontWeight = FontWeight.Medium
@@ -201,7 +262,7 @@ fun UvIndexCard(
                     Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
-                        text = "Максимальное время на солнце",
+                        text = "Макс. время на солнце",
                         color = Color.White,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Normal,
